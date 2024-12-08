@@ -74,6 +74,7 @@ namespace lsmdb {
                 unmap_file();
                 m_values.clear();
                 fclose(m_file);
+                m_file = nullptr;
             }
         }
 
