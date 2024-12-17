@@ -22,7 +22,7 @@ namespace lsmdb {
         }
 
         void set_codec(codec_base* codec) {
-            m_jcodec = codec;
+            m_codec = codec;
         }
 
         void flush() {
@@ -113,14 +113,14 @@ namespace lsmdb {
         string_view read_value(lua_State* L, int idx) {
             size_t len;
             int type = lua_type(L, idx);
-            if (m_jcodec) {
+            if (m_codec) {
                 switch (type) {
                 case LUA_TNIL:
                 case LUA_TTABLE:
                 case LUA_TNUMBER:
                 case LUA_TSTRING:
                 case LUA_TBOOLEAN: {
-                    const char* buf = (const char*)m_jcodec->encode(L, idx, &len);
+                    const char* buf = (const char*)m_codec->encode(L, idx, &len);
                     return string_view(buf, len);
                 }
                 default:
@@ -136,9 +136,9 @@ namespace lsmdb {
         }
 
         void push_value(lua_State* L, const char* buf, size_t len) {
-            if (m_jcodec) {
+            if (m_codec) {
                 try {
-                    m_jcodec->decode(L, (uint8_t*)buf, len);
+                    m_codec->decode(L, (uint8_t*)buf, len);
                 } catch (...) {
                     lua_pushlstring(L, buf, len);
                 }
@@ -151,6 +151,6 @@ namespace lsmdb {
 
     protected:
         smdb* m_smdb = nullptr;
-        codec_base* m_jcodec = nullptr;
+        codec_base* m_codec = nullptr;
     };
 }
