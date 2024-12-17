@@ -7,6 +7,7 @@
 #ifdef WIN32
 #include <io.h>
 #define fileno _fileno
+#define ftruncate _chsize
 #define filelength _filelength
 #else
 #include <climits>
@@ -35,10 +36,11 @@ namespace lsmdb {
 
     enum class smdb_code : uint8_t {
         SMDB_SUCCESS,
-        SMDB_DB_NOT_INIT,
-        SMDB_SIZE_KEY_FAIL,
+        SMDB_DB_NOT_INIT = 1,
+        SMDB_DB_ITER_ING,
+        SMDB_SIZE_KEY_FAIL = 11,
         SMDB_SIZE_VAL_FAIL,
-        SMDB_FILE_OPEN_FAIL,
+        SMDB_FILE_OPEN_FAIL = 21,
         SMDB_FILE_FDNO_FAIL,
         SMDB_FILE_MMAP_FAIL,
         SMDB_FILE_HANDLE_FAIL,
@@ -79,7 +81,23 @@ namespace lsmdb {
             }
         }
 
+        size_t size() { return m_offset; }
+        size_t capacity() { return m_alloc; }
+        size_t count() { return m_values.size(); }
+
+        smdb_code clear() {
+            if (!m_itering) {
+                m_waste = 0;
+                m_values.clear();
+                m_offset = sizeof(TSMDB);
+                memset(m_buffer + m_offset, 0, m_alloc - m_offset);
+                return shrink(m_offset);
+            }
+            return smdb_code::SMDB_DB_ITER_ING;
+        }
+
         smdb_code put(string& key, string_view val) {
+            if (m_itering) return smdb_code::SMDB_DB_ITER_ING;
             uint32_t ksz = key.size(), vsz = val.size();
             if (ksz > KEY_SIZE_MAX) return smdb_code::SMDB_SIZE_KEY_FAIL;
             if (vsz > VAL_SZIE_MAX) return smdb_code::SMDB_SIZE_VAL_FAIL;
@@ -121,7 +139,8 @@ namespace lsmdb {
             return  "";
         }
 
-        void del(string& key) {
+        smdb_code del(string& key) {
+            if (m_itering) return smdb_code::SMDB_DB_ITER_ING;
             auto it = m_values.find(key);
             if (it != m_values.end()) {
                 auto& dval = it->second;
@@ -130,6 +149,7 @@ namespace lsmdb {
                 m_values.erase(it);
                 m_waste += size;
             }
+            return smdb_code::SMDB_SUCCESS;
         }
 
         bool first(string_view& key, string_view& val) {
@@ -138,6 +158,7 @@ namespace lsmdb {
                 key = m_iter->first;
                 auto& dval = m_iter->second;
                 val = string_view(m_buffer + dval.voffset, dval.vsize);
+                m_itering = true;
                 return true;
             }
             return false;
@@ -151,6 +172,7 @@ namespace lsmdb {
                 val = string_view(m_buffer + dval.voffset, dval.vsize);
                 return true;
             }
+            m_itering = false;
             return false;
         }
 
@@ -186,6 +208,7 @@ namespace lsmdb {
         }
 
         smdb_code map_file() {
+            ftruncate(m_fd, m_alloc);
 #ifdef WIN32
             HANDLE hf = (HANDLE)_get_osfhandle(m_fd);
             if (!hf) return smdb_code::SMDB_FILE_HANDLE_FAIL;
@@ -195,7 +218,6 @@ namespace lsmdb {
             m_buffer = (char*)MapViewOfFileEx(hfm, FILE_MAP_ALL_ACCESS, 0, 0, 0, 0);
             CloseHandle(hfm);
 #else
-            ftruncate(m_fd, m_alloc);
             m_buffer = (char*)mmap(NULL, m_alloc, PROT_WRITE, MAP_SHARED, m_fd, 0);
 #endif // WIN32
             if (!m_buffer) return smdb_code::SMDB_FILE_MMAP_FAIL;
@@ -280,11 +302,12 @@ namespace lsmdb {
     protected:
         int32_t m_fd = 0;
         uint32_t m_waste = 0;                               //浪费的bytes
-        uint32_t m_offset = 0;                              //当前位置
         uint32_t m_alloc = 0;                               //分配的bytes
+        uint32_t m_offset = 0;                              //当前位置
         unordered_map<string, dbval> m_values;              //kv列表
         unordered_map<string, dbval>::iterator m_iter;      //迭代器
         char* m_buffer = nullptr;
         FILE* m_file = nullptr;
+        bool m_itering = false;
     };
 }
