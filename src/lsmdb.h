@@ -105,7 +105,7 @@ namespace lsmdb {
             size_t len;
             int type = lua_type(L, idx);
             if (type != LUA_TSTRING && type != LUA_TNUMBER) {
-                luaL_error(L, "lsmdb read %d type %s not suppert!", idx, lua_typename(L, idx));
+                luaL_error(L, "lsmdb read key %d type %s not suppert!", idx, lua_typename(L, idx));
             }
             if (m_codec) {
                 const char* buf = (const char*)m_codec->encode(L, idx, &len);
@@ -129,12 +129,12 @@ namespace lsmdb {
                     return string_view(buf, len);
                 }
                 default:
-                    luaL_error(L, "lsmdb read %d type %s not suppert!", idx, lua_typename(L, idx));
+                    luaL_error(L, "lsmdb read value %d type %s not suppert!", idx, lua_typename(L, idx));
                     break;
                 }
             }
             if (type != LUA_TSTRING && type != LUA_TNUMBER) {
-                luaL_error(L, "lsmdb read %d type %s not suppert!", idx, lua_typename(L, idx));
+                luaL_error(L, "lsmdb read value %d type %s not suppert!", idx, lua_typename(L, idx));
             }
             const char* buf = lua_tolstring(L, idx, &len);
             return string_view(buf, len);
