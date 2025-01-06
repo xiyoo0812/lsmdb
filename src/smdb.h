@@ -6,6 +6,7 @@
 
 #ifdef WIN32
 #include <io.h>
+#include <windows.h>
 #define fileno _fileno
 #define ftruncate _chsize
 #define filelength _filelength
